@@ -9,32 +9,42 @@ namespace Client
     {
         static async Task Main(string[] args)
         {
+            Console.WriteLine("Welcome to the CLIENT");
             IPEndPoint ipEndPoint = await Config.GetEndPoint();
 
-            Console.WriteLine("Welcome to the server");
             using Socket client = new(ipEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-
             await client.ConnectAsync(ipEndPoint);
+            MessageAgent agent = new MessageAgent(client);
             while (true)
             {
                 // Send message.
-                var message = "Hi friends 👋!<|EOM|>";
-                var messageBytes = Encoding.UTF8.GetBytes(message);
-                _ = await client.SendAsync(messageBytes, SocketFlags.None);
-                Console.WriteLine($"Socket client sent message: \"{message}\"");
+                var message = "Connect!<|EOM|>";
+                await agent.SendMessageAsync(message);
+                Console.WriteLine($"Requesting connection to the server...");
 
                 // Receive ack.
-                var buffer = new byte[1_024];
-                var received = await client.ReceiveAsync(buffer, SocketFlags.None);
-                var response = Encoding.UTF8.GetString(buffer, 0, received);
+                string response = await agent.ReceiveMessageAsync();
                 if (response == "<|ACK|>")
                 {
-                    Console.WriteLine($"Socket client received acknowledgment: \"{response}\"");
+                    Console.WriteLine($"Connection to the server successfull");
                     break;
                 }
-                // Sample output:
-                //     Socket client sent message: "Hi friends 👋!<|EOM|>"
-                //     Socket client received acknowledgment: "<|ACK|>"
+            }
+
+            while (true)
+            {
+                string msg = Console.ReadLine() ?? "";
+                if (msg is not null && msg.Equals("END"))
+                {
+                    break;
+                }
+                if (msg is not null)
+                {
+                    await agent.SendMessageAsync(msg);
+                }
+                string m = await agent.ReceiveMessageAsync();
+                Console.WriteLine($"SERVER: {m}");
+                
             }
 
             client.Shutdown(SocketShutdown.Both);
